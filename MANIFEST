@@ -1,0 +1,15 @@
+Changes
+LICENSE
+MANIFEST
+META.yml
+Makefile.PL
+README
+benchmark/compare.pl
+benchmark/io-async.pl
+dist.ini
+examples/io-async.pl
+examples/manual.pl
+examples/socket.pl
+lib/Protocol/Memcached.pm
+t/00-pod.t
+t/00-use.t

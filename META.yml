@@ -1,0 +1,15 @@
+---
+abstract: 'Support for the memcached binary protocol'
+author:
+  - 'Tom Molesworth <tom@entitymodel.com>'
+build_requires: {}
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.200008, CPAN::Meta::Converter version 2.110930'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Protocol-Memcached
+version: 0.001
