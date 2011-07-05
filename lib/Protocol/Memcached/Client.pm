@@ -1,13 +1,14 @@
-package Protocol::Memcached;
-# ABSTRACT: Support for the memcached binary protocol
+package Protocol::Memcached::Client;
+BEGIN {
+  $Protocol::Memcached::Client::VERSION = '0.002';
+}
 use strict;
 use warnings FATAL => 'all';
-
-our $VERSION = '0.002';
+use parent qw(Protocol::Memcached);
 
 =head1 NAME
 
-Protocol::Memcached - memcached binary protocol implementation
+Protocol::Memcached::Client - memcached client binary protocol implementation
 
 =head1 VERSION
 
@@ -16,7 +17,7 @@ version 0.002
 =head1 SYNOPSIS
 
  package Subclass::Of::Protocol::Memcached;
- use parent qw(Protocol::Memcached);
+ use parent qw(Protocol::Memcached::Client);
 
  sub write { $_[0]->{socket}->write($_[1]) }
 
@@ -42,9 +43,6 @@ method.
 
 If you're using this class, you're most likely doing it wrong - head over to the
 L</SEE ALSO> section to rectify this.
-
-L<Protocol::Memcached::Client> is probably the module you want if you are going to subclass
-this.
 
 =head1 SUBCLASSING
 
@@ -126,27 +124,6 @@ my %RESPONSE_STATUS = (
 =head1 METHODS
 
 =cut
-
-=head2 new
-
-Bare minimum constructor - subclass may need to inherit from something with a
-non-trivial constructor, so we put all our init code in L</init>.
-
-=cut
-
-sub new {
-	my $class = shift;
-	my $self = bless { }, $class;
-	return $self;
-}
-
-=head2 sap
-
-Helper method for weak callbacks.
-
-=cut
-
-sub sap { my ($self, $sub) = @_; Scalar::Util::weaken $self; return sub { $self->$sub(@_); }; }
 
 =head2 get
 
@@ -308,71 +285,9 @@ sub on_read {
 	return 1;
 }
 
-=head2 build_packet
-
-Generic packet construction.
-
-=cut
-
-sub build_packet {
-	my $self = shift;
-	my %args = @_;
-	my $pkt = pack(
-		'C1 C1 S1 C1 C1 S1 N1 N1 N1',
-		$args{request} ? MAGIC_REQUEST : MAGIC_RESPONSE,
-		$args{opcode},
-		defined($args{key}) ? length($args{key}) : 0,
-		defined($args{extras}) ? length($args{extras}) : 0,
-		0x00,
-		defined($args{body}) ? length($args{body}) : 0,
-		0x00,
-		0x00
-	);
-	return $pkt;
-}
-
 1;
 
 __END__
-
-=head1 WHY
-
-Three main reasons:
-
-=over 4
-
-=item * B<Transport-agnostic> - purposefully does B< not > get involved in the details of
-sending or receiving data, when it wants to write something it'll call L<write>, and
-when you have data to process you call L<on_read>
-
-=item * B<Nonblocking> - since this just operates on data and callbacks, rather than getting
-involved in transporting data, all operations should return quickly (in Perl terms)
-
-=item * B<Debugging support> - strap this over a memcached transport layer and see
-human-readable versions of the binary packets
-
-=back
-
-If you're looking for good performance, stability, an extensive set of tests, support,
-and a pony, then you're reading the wrong module:
-
-=head1 SEE ALSO
-
-=over 4
-
-=item * L<Cache::Memcached> - official implementation
-
-=item * L<AnyEvent::Memcached> - text protocol support for L<AnyEvent>
-
-=item * L<Cache::Memcached::AnyEvent> - provides binary protocol support for L<AnyEvent>
-
-=item * L<Memcached::Client> - another L<AnyEvent> implementation, again with the
-transport layer too highly coupled for my purposes
-
-=item * L<Cache::Memcached::GetParserXS> - XS implementation for parsing memcached
-binary data, apparently "possibly twice as fast as the original perl version".
-
-=back
 
 =head1 AUTHOR
 

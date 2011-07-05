@@ -8,8 +8,8 @@ benchmark/compare.pl
 benchmark/io-async.pl
 dist.ini
 examples/io-async.pl
-examples/manual.pl
 examples/socket.pl
 lib/Protocol/Memcached.pm
+lib/Protocol/Memcached/Client.pm
 t/00-pod.t
 t/00-use.t

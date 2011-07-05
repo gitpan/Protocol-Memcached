@@ -1,3 +1,7 @@
+0.002     2011-07-06 00:00:08 Europe/London
+	Add ::Client subclass, and some cleanup.
+	Pass %args to on_read and ->set/->get callbacks, for consistency.
+
 0.001     2011-07-02 21:23:44 Europe/London
 	Preliminary release to CPAN.
 
