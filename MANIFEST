@@ -1,6 +1,8 @@
 Changes
+INSTALL
 LICENSE
 MANIFEST
+META.json
 META.yml
 Makefile.PL
 README
@@ -11,5 +13,11 @@ examples/io-async.pl
 examples/socket.pl
 lib/Protocol/Memcached.pm
 lib/Protocol/Memcached/Client.pm
-t/00-pod.t
-t/00-use.t
+t/00-compile.t
+t/ketama.t
+xt/release/mojibake.t
+xt/release/pod-coverage.t
+xt/release/pod-syntax.t
+xt/release/synopsis.t
+xt/release/test-version.t
+xt/release/unused-vars.t

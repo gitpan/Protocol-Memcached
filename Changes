@@ -1,3 +1,6 @@
+0.004     2012-09-28 10:00:56 Europe/London
+	Basic support for Ketama consistent hashing algorithm
+
 0.003     2011-07-07 22:26:53 Europe/London
 	Some day I'll remember that parent.pm is *not* a core module.
 

@@ -3,7 +3,7 @@ package Protocol::Memcached;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 
 =head1 NAME
 
@@ -11,7 +11,7 @@ Protocol::Memcached - memcached binary protocol implementation
 
 =head1 VERSION
 
-version 0.003
+version 0.004
 
 =head1 SYNOPSIS
 
@@ -69,6 +69,10 @@ and when you have data, call L</on_read>.
 # Modules
 
 use Scalar::Util ();
+use Digest::MD5 ();
+use List::Util qw(sum);
+use List::UtilsBy qw(nsort_by);
+use POSIX qw(floor);
 
 # Constants
 
@@ -257,6 +261,10 @@ sub set {
 
 =head2 init
 
+Sets things up.
+
+Currently just does some internal housekeeping, takes no parameters, and returns $self.
+
 =cut
 
 sub init {	
@@ -279,11 +287,13 @@ that this method be called repeatedly until it returns false.
 sub on_read {
 	my ($self, $buffref) = @_;
 
-# Bail out if we don't have a full header
+	# Bail out if we don't have a full header
 	return 0 unless length $$buffref >= 24;
 
-# Extract the basic header data first - specifically we want the length
-	my ($magic, $opcode, $kl, $el, $dt, $status, $blen, $opaque, $cas1, $cas2) = unpack('C1 C1 n1 C1 C1 n1 N1 N1 N1 N1', $$buffref);
+	# Extract the basic header data first - specifically we want the length
+	# Not using most of these. At least, not yet
+	# my ($magic, $opcode, $kl, $el, $dt, $status, $blen, $opaque, $cas1, $cas2) = unpack('C1 C1 n1 C1 C1 n1 N1 N1 N1 N1', $$buffref);
+	my ($magic, $opcode, undef, undef, undef, $status, $blen) = unpack('C1 C1 n1 C1 C1 n1 N1 N1 N1 N1', $$buffref);
 	die "Not a response" unless $magic == MAGIC_RESPONSE;
 
 # If we don't have the full body as well, bail out here
@@ -294,18 +304,31 @@ sub on_read {
 
 	my $body = substr $$buffref, 0, $blen, '';
 	if($opcode == 0x00) {
-		my $flags = substr $body, 0, 4, '';
+		# unused
+		# my $flags = substr $body, 0, 4, '';
+		substr $body, 0, 4, '';
 	}
-#	printf "=> %-9.9s %-40.40s %08x%08x %s\n", $OPCODE_BY_ID{$opcode}, $body, $cas1, $cas2, $RESPONSE_STATUS{$status} // 'unknown status';
+	# printf "=> %-9.9s %-40.40s %08x%08x %s\n", $OPCODE_BY_ID{$opcode}, $body, $cas1, $cas2, $RESPONSE_STATUS{$status} // 'unknown status';
 	my $item = shift @{$self->{pending}} or die "Had response with no queued item\n";
 	$item->{value} = $body if length $body;
 	if($status) {
-		$item->{on_error}->(%$item, status => $status) if exists $item->{on_error};
+		return $item->{on_error}->(%$item, status => $status) if exists $item->{on_error};
 		die "Failed with " . $RESPONSE_STATUS{$status} . " on item " . join ',', %$item . "\n";
 	} else {
 		$item->{on_complete}->(%$item) if exists $item->{on_complete};
 	}
 	return 1;
+}
+
+=head2 status_text
+
+Returns the status message corresponding to the given code.
+
+=cut
+
+sub status_text {
+	my $self = shift;
+	$RESPONSE_STATUS{+shift}
 }
 
 =head2 build_packet
@@ -329,6 +352,120 @@ sub build_packet {
 		0x00
 	);
 	return $pkt;
+}
+
+=head2 hash_key
+
+Returns a hashed version of the given key using md5.
+
+=cut
+
+sub hash_key {
+	my $self = shift;
+	return Digest::MD5::md5(shift);
+}
+
+=head2 ketama
+
+Provided for backward compatibility only. See L</hash_key>.
+
+=cut
+
+sub ketama { shift->hash_key(@_) }
+
+=head2 build_ketama_map
+
+Generates a Ketama hash map from the given list of servers.
+
+Returns an arrayref of points.
+
+=cut
+
+sub build_ketama_map {
+	my $self = shift;
+	my @servers = @_;
+	my $total = 0 + sum values %{ +{ @servers } };
+	my @points;
+	my $server_count = @servers / 2;
+	while(@servers) {
+		my ($srv, $weight) = splice @servers, 0, 2;
+		my $pct = $weight / $total;
+		my $ks = floor($pct * 40.0 * $server_count);
+		foreach my $k (0..$ks-1) {
+			my $hash = sprintf '%s-%d', $srv, $k;
+			my @digest = map ord, split //, $self->hash_key($hash);
+			foreach my $h (0..3) {
+				push @points, {
+					point => ( $digest[3+$h*4] << 24 )
+					| ( $digest[2+$h*4] << 16 )
+					| ( $digest[1+$h*4] <<  8 )
+					|   $digest[$h*4],
+					ip => $srv
+				};
+			}
+		}
+	}
+	@points = nsort_by { $_->{point} } @points;
+	$self->{points} = \@points;
+	return \@points;
+}
+
+=head2 ketama_hashi
+
+Calculates an integer hash value from the given key.
+
+=cut
+
+sub ketama_hashi {
+	my $self = shift;
+	my $key = shift;
+	my @digest = map ord, split //, $self->hash_key($key);
+    	return ( $digest[3] << 24 )
+		| ( $digest[2] << 16 )
+		| ( $digest[1] <<  8 )
+		|   $digest[0];
+}
+
+=head2 ketama_find_point
+
+Given a key value, calculates the closest point on the Ketama map.
+
+=cut
+
+sub ketama_find_point {
+	my ($self, $key) = @_;
+
+	# Convert this key into a suitably-hashed integer
+	my $h = $self->ketama_hashi($key);
+
+	# Find the array bounds...
+	my $highp = my $maxp = scalar @{$self->{points}};
+	my $lowp = 0;
+
+	# then kick off our divide and conquer array search,
+	# which will end when we've found the server with next
+	# biggest point after what this key hashes to
+	while(1) {
+		my $midp = floor(($lowp + $highp ) / 2);
+		if ( $midp == $maxp ) {
+			# if at the end, roll back to zeroth
+			# off-by-one? you'd think, but note the oh-so-helpful $midp-1 later on.
+			$midp = 1 if $midp == @{$self->{points}};
+			return $self->{points}->[$midp - 1];
+		}
+		my $midval = $self->{points}->[$midp]->{point};
+		my $midval1 = $midp == 0 ? 0 : $self->{points}->[$midp-1]->{point};
+
+		return $self->{points}->[$midp] if $h <= $midval && $h > $midval1;
+
+		if ($midval < $h) {
+			$lowp = $midp + 1;
+		} else {
+			$highp = $midp - 1;
+		}
+
+		return $self->{points}->[0] if $lowp > $highp;
+	}
 }
 
 1;
@@ -380,4 +517,4 @@ Tom Molesworth <cpan@entitymodel.com>
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2011. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2011-2012. Licensed under the same terms as Perl itself.

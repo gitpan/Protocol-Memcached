@@ -9,22 +9,25 @@ use ExtUtils::MakeMaker 6.30;
 
 
 my %WriteMakefileArgs = (
-  'ABSTRACT' => 'Support for the memcached binary protocol',
-  'AUTHOR' => 'Tom Molesworth <tom@entitymodel.com>',
-  'BUILD_REQUIRES' => {},
-  'CONFIGURE_REQUIRES' => {
-    'ExtUtils::MakeMaker' => '6.30'
+  "ABSTRACT" => "Support for the memcached binary protocol",
+  "AUTHOR" => "Tom Molesworth <tom\@entitymodel.com>",
+  "BUILD_REQUIRES" => {
+    "Test::More" => "0.98"
   },
-  'DISTNAME' => 'Protocol-Memcached',
-  'EXE_FILES' => [],
-  'LICENSE' => 'perl',
-  'NAME' => 'Protocol::Memcached',
-  'PREREQ_PM' => {
-    'parent' => '0'
+  "CONFIGURE_REQUIRES" => {
+    "ExtUtils::MakeMaker" => "6.30"
   },
-  'VERSION' => '0.003',
-  'test' => {
-    'TESTS' => 't/*.t'
+  "DISTNAME" => "Protocol-Memcached",
+  "EXE_FILES" => [],
+  "LICENSE" => "perl",
+  "NAME" => "Protocol::Memcached",
+  "PREREQ_PM" => {
+    "List::UtilsBy" => 0,
+    "parent" => 0
+  },
+  "VERSION" => "0.004",
+  "test" => {
+    "TESTS" => "t/*.t"
   }
 );
 
